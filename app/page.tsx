@@ -2,6 +2,25 @@
 
 import { useState } from "react";
 
+const replyTypes = [
+  { value: "text", label: "Text" },
+  { value: "email", label: "Email" },
+  { value: "dm", label: "DM" },
+  { value: "support", label: "Support" },
+];
+
+const tones = [
+  { value: "friendly", label: "Friendly" },
+  { value: "casual", label: "Casual" },
+  { value: "professional", label: "Professional" },
+];
+
+const lengths = [
+  { value: "short", label: "Short" },
+  { value: "medium", label: "Medium" },
+  { value: "long", label: "Long" },
+];
+
 export default function Home() {
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("friendly");
@@ -54,120 +73,102 @@ export default function Home() {
     }
   };
 
+  const renderOptionGroup = (
+    title: string,
+    items: { value: string; label: string }[],
+    selected: string,
+    onSelect: (value: string) => void
+  ) => (
+    <div className="mt-5">
+      <label className="mb-2 block text-sm font-medium text-gray-700">
+        {title}
+      </label>
+
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => {
+          const isActive = selected === item.value;
+
+          return (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => onSelect(item.value)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                isActive
+                  ? "bg-black text-white"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <main className="min-h-screen bg-gray-50 px-6 py-10">
-      <div className="mx-auto max-w-3xl">
+    <main className="min-h-screen bg-gray-100 px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8">
+          <p className="mb-2 text-sm font-medium uppercase tracking-wide text-gray-500">
+            AI writing tool
+          </p>
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            Smart Reply Generator
+          </h1>
+          <p className="mt-3 max-w-2xl text-gray-600">
+            Paste a message, choose the format you want, and generate three
+            polished reply options instantly.
+          </p>
+        </div>
 
-        <h1 className="mb-2 text-4xl font-bold text-gray-900">
-          Smart Reply Generator
-        </h1>
-
-        <p className="mb-8 text-gray-600">
-          Generate quick AI replies for messages, emails, or chats.
-        </p>
-
-        <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
           <label className="mb-3 block text-sm font-medium text-gray-700">
-            Message
+            Original Message
           </label>
 
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                handleGenerate();
+              }
+            }}
             placeholder="Paste the message here..."
-            className="min-h-[160px] w-full rounded-xl border border-gray-300 p-4 text-gray-900 outline-none focus:border-black"
+            className="min-h-[170px] w-full rounded-2xl border border-gray-300 p-4 text-gray-900 outline-none transition focus:border-black"
           />
 
-          {/* Reply Type */}
-          <div className="mt-4">
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Reply Type
-            </label>
+          {renderOptionGroup("Reply Type", replyTypes, replyType, setReplyType)}
+          {renderOptionGroup("Tone", tones, tone, setTone)}
+          {renderOptionGroup("Reply Length", lengths, length, setLength)}
 
-            <div className="flex flex-wrap gap-3">
-              {["text", "email", "dm", "support"].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setReplyType(type)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                    replyType === type
-                      ? "bg-black text-white"
-                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tone */}
-          <div className="mt-4">
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Tone
-            </label>
-
-            <div className="flex flex-wrap gap-3">
-              {["friendly", "casual", "professional"].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTone(t)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                    tone === t
-                      ? "bg-black text-white"
-                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Length */}
-          <div className="mt-4">
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Reply Length
-            </label>
-
-            <div className="flex flex-wrap gap-3">
-              {["short", "medium", "long"].map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLength(l)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                    length === l
-                      ? "bg-black text-white"
-                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={handleGenerate}
               disabled={loading || !message.trim()}
-              className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Generating..." : "Generate Replies"}
             </button>
 
             <button
+              type="button"
               onClick={() => {
                 setMessage("");
                 setReplies([]);
                 setError("");
               }}
-              className="rounded-xl border border-gray-300 px-5 py-3 text-sm"
+              disabled={loading}
+              className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Clear
             </button>
+
+            <p className="text-sm text-gray-500">
+              Press Ctrl + Enter to generate faster
+            </p>
           </div>
 
           {loading && (
@@ -176,44 +177,51 @@ export default function Home() {
             </p>
           )}
 
-          {error && (
-            <p className="mt-4 text-sm text-red-600">{error}</p>
-          )}
+          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         </div>
 
         {replies.length > 0 && (
-          <div className="space-y-6">
-            {replies.map((reply, index) => (
-              <div
-                key={index}
-                className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-              >
-                <div className="mb-4 flex items-start justify-between">
-
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Reply Option {index + 1}
-                  </h2>
-
-                  <button
-                    onClick={() => handleCopy(reply, index)}
-                    className={`rounded-lg px-4 py-2 text-sm text-white ${
-                      copiedIndex === index ? "bg-green-600" : "bg-black"
-                    }`}
-                  >
-                    {copiedIndex === index ? "Copied!" : "Copy"}
-                  </button>
-
-                </div>
-
-                <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-700">
-                  {reply}
+          <div className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Generated Replies
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Choose your favorite and copy it with one click.
                 </p>
-
               </div>
-            ))}
+            </div>
+
+            <div className="space-y-5">
+              {replies.map((reply, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Reply Option {index + 1}
+                    </h3>
+
+                    <button
+                      onClick={() => handleCopy(reply, index)}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${
+                        copiedIndex === index ? "bg-green-600" : "bg-black"
+                      }`}
+                    >
+                      {copiedIndex === index ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+
+                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-700">
+                    {reply}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-
       </div>
     </main>
   );

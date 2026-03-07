@@ -1,84 +1,81 @@
 import OpenAI from "openai";
+import { NextResponse } from "next/server";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
-    const { review } = await req.json();
+    const { message, tone, length, replyType } = await req.json();
 
-    if (!review || typeof review !== "string") {
-      return Response.json({ error: "Review is required" }, { status: 400 });
+    if (!message?.trim()) {
+      return NextResponse.json(
+        { error: "Message is required" },
+        { status: 400 }
+      );
     }
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    const selectedTone =
+      tone === "casual" || tone === "professional" || tone === "friendly"
+        ? tone
+        : "friendly";
 
-    const completion = await openai.chat.completions.create({
+    const selectedLength =
+      length === "short" || length === "medium" || length === "long"
+        ? length
+        : "medium";
+
+    const selectedReplyType =
+      replyType === "text" ||
+      replyType === "email" ||
+      replyType === "dm" ||
+      replyType === "support"
+        ? replyType
+        : "text";
+
+    const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `
-You are a business owner replying to Google reviews.
-
-First determine if the review is:
-• Positive
-• Neutral
-• Negative
-
-Then write 3 different reply options.
-
-Guidelines:
-
-If POSITIVE:
-• thank the customer
-• show appreciation
-• invite them back
-
-If NEGATIVE:
-• apologize sincerely
-• acknowledge the issue
-• show commitment to improving
-• remain calm and professional
-
-If NEUTRAL:
-• thank them
-• acknowledge the feedback
-
-General rules:
-• keep each reply 2–3 sentences
-• sound warm and professional
-• do NOT use placeholders like [Customer Name]
-• write naturally like a real business owner
-
-Return your answer in this exact format:
-
-OPTION 1:
-...
-
-OPTION 2:
-...
-
-OPTION 3:
-...
-`,
+          content: `Generate exactly 3 natural ${selectedReplyType} replies in a ${selectedTone} tone. Each reply should be ${selectedLength} length. Return only valid JSON in this exact format: ["reply 1", "reply 2", "reply 3"]`,
         },
         {
           role: "user",
-          content: `Customer review: ${review}
-
-Write 3 appropriate reply options from the business owner.`,
+          content: `Message: ${message}`,
         },
       ],
+      temperature: 0.8,
     });
 
-    const reply = completion.choices[0].message.content;
+    const text = completion.choices[0]?.message?.content || "[]";
 
-    return Response.json({ reply });
+    let replies: string[] = [];
+
+    try {
+      const parsed = JSON.parse(text);
+      replies = Array.isArray(parsed)
+        ? parsed.filter((item) => typeof item === "string").slice(0, 3)
+        : [];
+    } catch {
+      replies = [];
+    }
+
+    if (replies.length === 0) {
+      replies = [
+        "Thanks for your message.",
+        "Happy to chat more.",
+        "Appreciate you reaching out.",
+      ];
+    }
+
+    return NextResponse.json({ replies });
   } catch (error) {
-    console.error(error);
+    console.error("OpenAI error:", error);
 
-    return Response.json(
-      { error: "Failed to generate reply" },
+    return NextResponse.json(
+      { error: "Something went wrong while generating replies." },
       { status: 500 }
     );
   }
