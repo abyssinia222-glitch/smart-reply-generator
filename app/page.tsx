@@ -6,6 +6,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("friendly");
   const [length, setLength] = useState("medium");
+  const [replyType, setReplyType] = useState("text");
   const [replies, setReplies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -24,7 +25,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message, tone, length }),
+        body: JSON.stringify({ message, tone, length, replyType }),
       });
 
       const data = await response.json();
@@ -56,6 +57,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-10">
       <div className="mx-auto max-w-3xl">
+
         <h1 className="mb-2 text-4xl font-bold text-gray-900">
           Smart Reply Generator
         </h1>
@@ -65,6 +67,7 @@ export default function Home() {
         </p>
 
         <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+
           <label className="mb-3 block text-sm font-medium text-gray-700">
             Message
           </label>
@@ -72,112 +75,87 @@ export default function Home() {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                handleGenerate();
-              }
-            }}
             placeholder="Paste the message here..."
-            className="min-h-[160px] w-full rounded-xl border border-gray-300 p-4 text-gray-900 outline-none transition focus:border-black"
+            className="min-h-[160px] w-full rounded-xl border border-gray-300 p-4 text-gray-900 outline-none focus:border-black"
           />
 
+          {/* Reply Type */}
+          <div className="mt-4">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Reply Type
+            </label>
+
+            <div className="flex flex-wrap gap-3">
+              {["text", "email", "dm", "support"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setReplyType(type)}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    replyType === type
+                      ? "bg-black text-white"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tone */}
           <div className="mt-4">
             <label className="mb-2 block text-sm font-medium text-gray-700">
               Tone
             </label>
 
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setTone("friendly")}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  tone === "friendly"
-                    ? "bg-black text-white"
-                    : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Friendly
-              </button>
-
-              <button
-                onClick={() => setTone("casual")}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  tone === "casual"
-                    ? "bg-black text-white"
-                    : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Casual
-              </button>
-
-              <button
-                onClick={() => setTone("professional")}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  tone === "professional"
-                    ? "bg-black text-white"
-                    : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Professional
-              </button>
+              {["friendly", "casual", "professional"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTone(t)}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    tone === t
+                      ? "bg-black text-white"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
           </div>
 
+          {/* Length */}
           <div className="mt-4">
             <label className="mb-2 block text-sm font-medium text-gray-700">
               Reply Length
             </label>
 
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setLength("short")}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  length === "short"
-                    ? "bg-black text-white"
-                    : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Short
-              </button>
-
-              <button
-                onClick={() => setLength("medium")}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  length === "medium"
-                    ? "bg-black text-white"
-                    : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Medium
-              </button>
-
-              <button
-                onClick={() => setLength("long")}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                  length === "long"
-                    ? "bg-black text-white"
-                    : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Long
-              </button>
+              {["short", "medium", "long"].map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLength(l)}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    length === l
+                      ? "bg-black text-white"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          {/* Buttons */}
+          <div className="mt-6 flex gap-3">
             <button
               onClick={handleGenerate}
               disabled={loading || !message.trim()}
-              className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {loading ? "Generating..." : "Generate Replies"}
-            </button>
-
-            <button
-              onClick={handleGenerate}
-              disabled={loading || !message.trim()}
-              className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Regenerate
             </button>
 
             <button
@@ -186,8 +164,7 @@ export default function Home() {
                 setReplies([]);
                 setError("");
               }}
-              disabled={loading}
-              className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-gray-300 px-5 py-3 text-sm"
             >
               Clear
             </button>
@@ -199,7 +176,9 @@ export default function Home() {
             </p>
           )}
 
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="mt-4 text-sm text-red-600">{error}</p>
+          )}
         </div>
 
         {replies.length > 0 && (
@@ -209,28 +188,32 @@ export default function Home() {
                 key={index}
                 className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
               >
-                <div className="mb-4 flex items-start justify-between gap-4">
+                <div className="mb-4 flex items-start justify-between">
+
                   <h2 className="text-lg font-semibold text-gray-900">
                     Reply Option {index + 1}
                   </h2>
 
                   <button
                     onClick={() => handleCopy(reply, index)}
-                    className={`rounded-lg px-4 py-2 text-sm text-white transition ${
+                    className={`rounded-lg px-4 py-2 text-sm text-white ${
                       copiedIndex === index ? "bg-green-600" : "bg-black"
                     }`}
                   >
                     {copiedIndex === index ? "Copied!" : "Copy"}
                   </button>
+
                 </div>
 
                 <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-700">
                   {reply}
                 </p>
+
               </div>
             ))}
           </div>
         )}
+
       </div>
     </main>
   );
