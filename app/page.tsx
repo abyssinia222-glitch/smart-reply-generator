@@ -1,28 +1,65 @@
 "use client";
 
-import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
+
+type ReplyCard = {
+  id: number;
+  text: string;
+};
+
+const DAILY_LIMIT = 20;
 
 export default function Page() {
   const { data: session } = useSession();
 
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("friendly");
-  const [reply, setReply] = useState("");
+  const [replies, setReplies] = useState<ReplyCard[]>([]);
   const [loading, setLoading] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const [usageCount, setUsageCount] = useState(0);
 
-  async function generateReply() {
-    if (!message.trim()) {
-      alert("Please enter a message");
+  async function loadUsage() {
+    if (!session?.user?.email) return;
+
+    try {
+      const res = await fetch("/api/usage", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: session.user.email,
+        }),
+      });
+
+      const data = await res.json();
+      setUsageCount(data.count || 0);
+    } catch (err) {
+      console.error("Failed to load usage:", err);
+    }
+  }
+
+  useEffect(() => {
+    loadUsage();
+  }, [session?.user?.email]);
+
+  async function handleGenerate() {
+    if (!session?.user?.email) {
+      setError("Please log in first");
       return;
     }
 
-    if (!session?.user?.email) {
-      alert("Please login first");
+    if (!message.trim()) {
+      setError("Please enter a message");
       return;
     }
 
     setLoading(true);
+    setError("");
+    setReplies([]);
 
     try {
       const res = await fetch("/api/generate", {
@@ -39,78 +76,216 @@ export default function Page() {
 
       const data = await res.json();
 
-      if (data.reply) {
-        setReply(data.reply);
-      } else {
-        alert(data.error || "Something went wrong");
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate reply");
-    }
 
-    setLoading(false);
+      const replyList: string[] = data.replies || [];
+
+      setReplies(
+        replyList.map((text: string, index: number) => ({
+          id: index + 1,
+          text,
+        }))
+      );
+
+      setMessage("");
+      setUsageCount((prev) => prev + 1);
+    } catch (err) {
+      console.error("Generate failed:", err);
+      setError("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return (
-    <main style={{ maxWidth: 700, margin: "40px auto", fontFamily: "Arial" }}>
-      <h1>Smart Reply Generator</h1>
+  async function handleCopy(text: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 1500);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  }
 
-      <p>Logged in as: {session?.user?.email}</p>
-
-      <textarea
-        placeholder="Paste the message you want to reply to..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        style={{
-          width: "100%",
-          height: 120,
-          padding: 10,
-          marginTop: 10,
-        }}
-      />
-
-      <div style={{ marginTop: 15 }}>
-        <label>Tone:</label>
-        <select
-          value={tone}
-          onChange={(e) => setTone(e.target.value)}
-          style={{ marginLeft: 10 }}
-        >
-          <option value="friendly">Friendly</option>
-          <option value="casual">Casual</option>
-          <option value="professional">Professional</option>
-        </select>
-      </div>
-
-      <button
-        onClick={generateReply}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          background: "black",
-          color: "white",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        {loading ? "Generating..." : "Generate Reply"}
-      </button>
-
-      {reply && (
-        <div style={{ marginTop: 30 }}>
-          <h3>AI Reply</h3>
-          <p
-            style={{
-              background: "#f5f5f5",
-              padding: 15,
-              borderRadius: 8,
-            }}
-          >
-            {reply}
+  if (!session) {
+    return (
+      <main className="min-h-screen bg-gray-100 px-6 py-12">
+        <div className="mx-auto max-w-4xl rounded-3xl border border-gray-200 bg-white p-10 shadow-sm">
+          <p className="mb-2 text-sm font-medium uppercase tracking-wide text-gray-500">
+            AI WRITING TOOL
           </p>
+          <h1 className="mb-3 text-4xl font-bold text-gray-900">
+            Smart Reply Generator
+          </h1>
+          <p className="mb-8 max-w-2xl text-gray-600">
+            Generate polished replies for emails, messages, and chats in seconds.
+          </p>
+
+          <button
+            onClick={() => signIn("github")}
+            className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Login with GitHub
+          </button>
         </div>
-      )}
+      </main>
+    );
+  }
+
+  const remaining = Math.max(0, DAILY_LIMIT - usageCount);
+
+  return (
+    <main className="min-h-screen bg-gray-100 px-6 py-10">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-gray-500">
+              AI WRITING TOOL
+            </p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Smart Reply Generator
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Logged in as: {session.user?.email}
+            </p>
+          </div>
+
+          <button
+            onClick={() => signOut()}
+            className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+          >
+            Logout
+          </button>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Daily free usage</p>
+              <p className="mt-1 text-sm text-gray-500">
+                {usageCount}/{DAILY_LIMIT} used
+              </p>
+            </div>
+
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">
+                {remaining} remaining
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Resets every day</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+          <label
+            htmlFor="message"
+            className="mb-3 block text-sm font-medium text-gray-700"
+          >
+            Message
+          </label>
+
+          <textarea
+            id="message"
+            name="message"
+            placeholder="Paste the message you want to reply to..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={5}
+            className="w-full rounded-2xl border border-gray-300 p-4 text-gray-900 outline-none transition focus:border-black"
+          />
+
+          <div className="mt-4">
+            <label
+              htmlFor="tone"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
+              Tone
+            </label>
+
+            <select
+              id="tone"
+              name="tone"
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-black"
+            >
+              <option value="friendly">Friendly</option>
+              <option value="professional">Professional</option>
+              <option value="casual">Casual</option>
+            </select>
+          </div>
+
+          <div className="mt-6 flex items-center gap-3">
+            <button
+              onClick={handleGenerate}
+              disabled={loading || !message.trim() || remaining === 0}
+              className="rounded-xl bg-black px-5 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Generating..." : "Generate 3 Replies"}
+            </button>
+          </div>
+
+          {loading && (
+            <p className="mt-4 text-sm text-gray-500">
+              Creating reply options...
+            </p>
+          )}
+
+          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+          {!loading && !error && replies.length === 0 && (
+            <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+              <p className="text-sm text-gray-600">
+                Your reply options will appear here after you generate them.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {replies.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Reply Options
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Pick your favorite and copy it with one click.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {replies.map((reply, index) => (
+                <div
+                  key={reply.id}
+                  className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Reply Option {reply.id}
+                    </h3>
+
+                    <button
+                      onClick={() => handleCopy(reply.text, index)}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${
+                        copiedIndex === index ? "bg-green-600" : "bg-black"
+                      }`}
+                    >
+                      {copiedIndex === index ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+
+                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-800">
+                    {reply.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
