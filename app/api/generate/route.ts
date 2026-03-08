@@ -1,13 +1,14 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
-const client = new OpenAI({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req: Request) {
   try {
-    const { message, tone, length } = await req.json();
+    const { message, tone, email } = await req.json();
 
     if (!message?.trim()) {
       return NextResponse.json(
@@ -16,58 +17,117 @@ export async function POST(req: Request) {
       );
     }
 
-    const selectedTone =
-      tone === "casual" || tone === "professional" || tone === "friendly"
-        ? tone
-        : "friendly";
+    if (!email) {
+      return NextResponse.json(
+        { error: "Email is required" },
+        { status: 400 }
+      );
+    }
 
-    const selectedLength =
-      length === "short" || length === "medium" || length === "long"
-        ? length
-        : "medium";
+    const today = new Date().toISOString().split("T")[0];
 
-    const completion = await client.chat.completions.create({
+    const { data: usage, error: usageError } = await supabase
+      .from("usage")
+      .select("*")
+      .eq("user_email", email)
+      .eq("date", today)
+      .maybeSingle();
+
+    if (usageError) {
+      console.error("Supabase read error:", usageError);
+      return NextResponse.json(
+        { error: "Failed to check usage" },
+        { status: 500 }
+      );
+    }
+
+    if (usage && usage.count >= 20) {
+      return NextResponse.json(
+        { error: "Daily limit reached" },
+        { status: 403 }
+      );
+    }
+
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `Generate exactly 3 short, natural reply options in a ${selectedTone} tone. Each reply should be ${selectedLength} length. Return only valid JSON in this exact format: ["reply 1", "reply 2", "reply 3"]`,
+          content: `Write exactly 3 short ${tone} replies to the user's message. Return only valid JSON in this exact format: ["reply 1", "reply 2", "reply 3"]`,
         },
         {
           role: "user",
-          content: `Message: ${message}`,
+          content: message,
         },
       ],
-      temperature: 0.8,
     });
 
-    const text = completion.choices[0]?.message?.content || "[]";
+    const content = completion.choices[0]?.message?.content?.trim();
+
+    if (!content) {
+      return NextResponse.json(
+        { error: "No replies generated" },
+        { status: 500 }
+      );
+    }
 
     let replies: string[] = [];
 
     try {
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(content);
       replies = Array.isArray(parsed)
         ? parsed.filter((item) => typeof item === "string").slice(0, 3)
         : [];
-    } catch {
-      replies = [];
+    } catch (error) {
+      console.error("JSON parse error:", error);
+      return NextResponse.json(
+        { error: "Failed to parse AI response" },
+        { status: 500 }
+      );
     }
 
     if (replies.length === 0) {
-      replies = [
-        "Thanks for your message.",
-        "Happy to chat more.",
-        "Appreciate you reaching out.",
-      ];
+      return NextResponse.json(
+        { error: "No replies generated" },
+        { status: 500 }
+      );
+    }
+
+    if (usage) {
+      const { error: updateError } = await supabase
+        .from("usage")
+        .update({ count: usage.count + 1 })
+        .eq("id", usage.id);
+
+      if (updateError) {
+        console.error("Supabase update error:", updateError);
+        return NextResponse.json(
+          { error: "Failed to update usage" },
+          { status: 500 }
+        );
+      }
+    } else {
+      const { error: insertError } = await supabase.from("usage").insert({
+        user_email: email,
+        date: today,
+        count: 1,
+      });
+
+      if (insertError) {
+        console.error("Supabase insert error:", insertError);
+        return NextResponse.json(
+          { error: "Failed to save usage" },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ replies });
   } catch (error) {
-    console.error("OpenAI error:", error);
+    console.error("Generate route error:", error);
 
     return NextResponse.json(
-      { error: "Something went wrong while generating replies." },
+      { error: "Something went wrong" },
       { status: 500 }
     );
   }
